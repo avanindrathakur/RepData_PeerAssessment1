@@ -1,0 +1,152 @@
+# Week 2 Project (Avanindra Nath Thakur)
+Downloadings and extracting the required data 
+
+```{r data, echo=TRUE}
+if(!file.exists("./data")){dir.create("./data")}
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+download.file(fileUrl,destfile="./data/activity.zip",method="auto", mode= "wb")
+unzip(zipfile="./data/activity.zip",exdir="./data")
+activity <- read.csv("./data/activity.csv")
+activity$date <- as.Date(activity$date)
+```
+
+Calculating mean of total number of steps taken per day 
+```{r mean, echo= TRUE}
+library(dplyr)
+stepsPerDay <- activity %>%
+        group_by(date) %>%
+        summarize(sumsteps = sum(steps, na.rm = TRUE)) 
+#Display head and tail of the rows of data
+head(stepsPerDay)
+tail(stepsPerDay)
+```
+
+Make a Histogram for total number of steps per day
+
+```{r Histogram, echo=TRUE}
+hist(stepsPerDay$sumsteps, main = "Histogram of Daily Steps", 
+     col="red", xlab="Steps", ylim = c(0,30))
+```
+Calculation of the mean and median of the total number of steps taken per day.
+
+```{r mean and median, echo=TRUE}
+meanPreNA <- round(mean(stepsPerDay$sumsteps),digits = 2)
+medianPreNA <- round(median(stepsPerDay$sumsteps),digits = 2)
+
+print(paste("The mean is: ", meanPreNA))
+print(paste("The median is: ", medianPreNA))
+```
+ 
+The average daily activity pattern.
+
+```{r pattern, echo= TRUE}
+ stepsPerInterval <- activity %>%
+        group_by(interval) %>%
+        summarize(meansteps = mean(steps, na.rm = TRUE)) 
+#Display first and last 6 rows of the data
+
+head(stepsPerInterval)
+tail(stepsPerInterval)
+
+```
+```{r plot, echo = TRUE}
+plot(stepsPerInterval$meansteps ~ stepsPerInterval$interval,
+     col="blue", type="l", xlab = "5 Minute Intervals", ylab = "Average Number of Steps",
+     main = "Steps By Time Interval")
+```
+ 
+The 5-minute interval, on average across all the days in the dataset that contains the maximum number of steps
+
+```{r Max steps, echo = TRUE}
+print(paste("Interval containing the most steps on average: ",stepsPerInterval$interval[which.max(stepsPerInterval$meansteps)]))
+
+print(paste("Average steps for that interval: ",round(max(stepsPerInterval$meansteps),digits=2)))
+```
+
+Imputing missing values
+
+```{r missing value, echo = TRUE}
+print(paste("The total number of rows with NA is: ",sum(is.na(activity$steps))))
+```
+Creating a new dataset that is equal to the original dataset but with the missing data filled in.
+
+```{r new data, echo = TRUE}
+activityNoNA <- activity  
+for (i in 1:nrow(activity)){
+        if(is.na(activity$steps[i])){
+                activityNoNA$steps[i]<- stepsPerInterval$meansteps[activityNoNA$interval[i] == stepsPerInterval$interval]
+        }
+}
+
+#Display first and last 6 rows of data
+head(activityNoNA)
+tail(activityNoNA)
+
+```
+
+Making a histogram of the total number of steps taken each day and Calculating and the mean and median of total number of steps taken per day. It shows that to what extent these values differ from the estimates from the first part of the assignment and also it refpects to What extent the impact of imputing missing data on the estimates of the total daily number of steps.
+
+```{r Historam 2, echo = TRUE}
+stepsPerDay <- activityNoNA %>%
+        group_by(date) %>%
+        summarize(sumsteps = sum(steps, na.rm = TRUE)) 
+
+hist(stepsPerDay$sumsteps, main = "Histogram of Daily Steps", 
+     col="blue", xlab="Steps")
+
+```
+
+The new Mean and Median 
+
+```{r New Mean and Median, echo = TRUE}
+meanPostNA <- round(mean(stepsPerDay$sumsteps), digits = 2)
+medianPostNA <- round(median(stepsPerDay$sumsteps), digits = 2)
+
+print(paste("The mean is: ", mean(meanPostNA)))
+print(paste("The median is: ", median(medianPostNA)))
+```
+It is important to note that NA values in the first part of the project were ignored (na.rm = TRUE). Once averages were applied to the missing values the overall mean increased.
+
+```{r compare, echo= TRUE}
+NACompare <- data.frame(mean = c(meanPreNA,meanPostNA),median = c(medianPreNA,medianPostNA))
+rownames(NACompare) <- c("Pre NA Transformation", "Post NA Transformation")
+print(NACompare)
+```
+## To check the differences in activity patterns between weekdays and weekends
+Creating a new factor variable in the dataset with two levels - “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+
+```{r, echo= TRUE}
+activityDoW <- activityNoNA
+activityDoW$date <- as.Date(activityDoW$date)
+activityDoW$day <- ifelse(weekdays(activityDoW$date) %in% c("Saturday", "Sunday"), "weekend", "weekday")
+activityDoW$day <- as.factor(activityDoW$day)
+```
+
+Making a panel plot containing a time series plot (i.e. type=“l”) of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+```{r additional plot, echo=TRUE}
+activityWeekday <- filter(activityDoW, activityDoW$day == "weekday")
+activityWeekend <- filter(activityDoW, activityDoW$day == "weekend")
+
+activityWeekday <- activityWeekday %>%
+        group_by(interval) %>%
+        summarize(steps = mean(steps)) 
+activityWeekday$day <- "weekday"
+
+activityWeekend <- activityWeekend %>%
+        group_by(interval) %>%
+        summarize(steps = mean(steps)) 
+activityWeekend$day <- "weekend"
+
+wkdayWkend <- rbind(activityWeekday, activityWeekend)
+wkdayWkend$day <- as.factor(wkdayWkend$day)
+
+library(ggplot2)
+g <- ggplot (wkdayWkend, aes (interval, steps))
+g + geom_line() + facet_grid (day~.) + 
+        theme(axis.text = element_text(size = 12),axis.title = element_text(size = 14)) + 
+        labs(y = "Number of Steps") + labs(x = "Interval") + 
+        ggtitle("Average Number of Steps - Weekday vs. Weekend") + 
+        theme(plot.title = element_text(hjust = 0.5))
+```
+thus, the chart shows slight differences in the step patterns throughout the average daily intervals. For weekdays there is a larger spike in the morning intervals that could indicate commuters on their way to work. Spikes during the late morning and early afternoon seem to be higher on the weekends. One can assume that this might be related to subjects running errands, doing yardwork, exercising, etc. Those same intervals for weekdays appear to be less perhaps due to subjects sitting at their desk, driving a truck or standing in front of a machine in a factory.
